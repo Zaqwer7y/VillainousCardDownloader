@@ -1,4 +1,3 @@
-<img width="545" height="158" alt="image" src="https://github.com/user-attachments/assets/18e51c93-2c45-4fcf-9a88-1da45865d6bb" /># VillainousCardDownloader
 This is a console application which downloads images of cards from fandom websites for the Villainous board game.
 
 Start Villainous.exe
