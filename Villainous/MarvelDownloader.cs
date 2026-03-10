@@ -6,7 +6,7 @@ namespace Villainous
 {
     internal class MarvelDownloader : BasicDownloader
     {
-        private static readonly string _urlBase = @"https://marvel-villainous-infinite-power.fandom.com/wiki/";
+        private static readonly string _urlBase = @"https://marvel-villainous-infinite-power.fandom.com/api.php?action=parse&page=";
         private static readonly int _defaultCardScale = 525;
 
         public MarvelDownloader(bool downloadCards)
@@ -14,15 +14,15 @@ namespace Villainous
         {
         }
 
-        public void Download()
+        public async Task Download()
         {
             Console.WriteLine("Villains or expansions? (v/e)");
             var ans = Console.ReadLine();
             var isVillain = ans.Equals("v", StringComparison.InvariantCultureIgnoreCase);
             if (isVillain)
-                DownloadVillains();
+                await DownloadVillains();
             else
-                DownloadCommonFate();
+                await DownloadCommonFate();
         }
 
         protected override IEnumerable<string> GetSpecialCards(string villain)
@@ -48,26 +48,26 @@ namespace Villainous
             return new string[0]; 
         }
 
-        private void DownloadCommonFate()
+        private async Task DownloadCommonFate()
         {
             bool userContinue = true;
             while (userContinue)
             {
                 Console.Write("Choose an expansion: ");
                 var expansionStr = Console.ReadLine();
-                DownloadCommonFateByExpansion(expansionStr);
+                await DownloadCommonFateByExpansion(expansionStr);
                 Console.WriteLine("Would you like to continue? (y/n)");
                 var ans = Console.ReadLine();
                 userContinue = ans.Equals("y", StringComparison.InvariantCultureIgnoreCase);
             }
         }
 
-        private void DownloadCommonFateByExpansion(string expansion)
+        private async Task DownloadCommonFateByExpansion(string expansion)
         {
             var idStr = HttpUtility.HtmlEncode($"{expansion.Replace(' ', '_')}_-_Card_Gallery");
-            using (var webClient = new WebClient())
+            using (var webClient = new HttpClient())
             {
-                string source = webClient.DownloadString(_urlBase);
+                string source = await webClient.GetStringAsync(_urlBase);
                 var htmlDoc = new HtmlDocument();
                 htmlDoc.LoadHtml(source);
                 var expansionEl = htmlDoc.GetElementbyId(idStr);
@@ -76,7 +76,7 @@ namespace Villainous
                 if (cardAnchors.Any())
                 {
                     foreach (var cardAnchor in cardAnchors)
-                        DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion);
+                        await DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion);
                 }
                 else
                 {
@@ -85,7 +85,7 @@ namespace Villainous
                         cardAnchors = fateCardsParagraphEl.NextSibling.ChildNodes.Where(a => a.Attributes.Any(a => a.Name == "href"));
                         foreach (var cardAnchor in cardAnchors)
                         {
-                            DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion + "\\2");
+                            await DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion + "\\2");
                         }
                         fateCardsParagraphEl = fateCardsParagraphEl.NextSibling.NextSibling;
                     }
@@ -93,7 +93,7 @@ namespace Villainous
                     {
                         cardAnchors = fateCardsParagraphEl.NextSibling.ChildNodes.Where(a => a.Attributes.Any(a => a.Name == "href"));
                         foreach (var cardAnchor in cardAnchors)
-                            DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion);
+                            await DownLoadCardLink(false, cardAnchor, webClient, "Fate " + expansion);
                     }
                 }
             }

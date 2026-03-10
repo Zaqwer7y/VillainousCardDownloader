@@ -11,13 +11,13 @@ namespace Villainous
     {
 
         public DisneyHomebrewDownloader(bool downloadCards)
-            : base(@"https://disney-villainous-homebrew.fandom.com/wiki/", "realm.jpg", downloadCards, 340, 1)
+            : base(@"https://disney-villainous-homebrew.fandom.com/api.php?action=parse&page=", "realm.jpg", downloadCards, 340, 1)
         {
         }
 
-        public void Download()
+        public async Task Download()
         {
-            DownloadVillains();
+            await DownloadVillains();
         }
 
         protected override IEnumerable<string> GetSpecialCards(string villain)

@@ -3,7 +3,7 @@
     public class AnimeDownloader : BasicDownloader
     {
         public AnimeDownloader(bool downloadCards)
-            : base(@"https://anime-villainous.fandom.com/wiki/", "Territory.png", downloadCards, 340, 1)
+            : base(@"https://anime-villainous.fandom.com/api.php?action=parse&page=", "Territory.png", downloadCards, 340, 1)
         {
         }
 
@@ -55,9 +55,9 @@
             }
             return new string[0];
         }
-        public void Download()
+        public async Task Download()
         {
-            DownloadVillains();
+            await DownloadVillains();
         }
     }
 }

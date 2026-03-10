@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace Villainous
@@ -29,12 +30,12 @@ namespace Villainous
 
         protected abstract IEnumerable<string> GetSpecialCards(string villain);
 
-        public void DownloadVillains()
+        public async Task DownloadVillains()
         {
             bool userContinue = true;
             while (userContinue)
             {
-                PrepareCards();
+                await PrepareCards();
                 Console.WriteLine("Would you like to continue? (y/n)");
                 var ans = Console.ReadLine();
                 userContinue = ans.Equals("y", StringComparison.InvariantCultureIgnoreCase);
@@ -51,29 +52,30 @@ namespace Villainous
         }
 
 
-        protected void PrepareCards()
+        protected async Task PrepareCards()
         {
             Console.Write("Enter a villain: ");
             _currentVillainStr = Console.ReadLine().Replace(' ', '_');
             var sourceLink = DomainBaseStr + _currentVillainStr;
             var cardsDic = new Dictionary<int, List<string>>();
-            using (var webClient = new WebClient())
+            var webClient = GetClient();
+            using (webClient)
             {
-                string source = webClient.DownloadString(sourceLink);
+                string source =  await GetHtmlString(webClient, sourceLink);
                 var htmlDoc = new HtmlDocument();
                 htmlDoc.LoadHtml(source);
                 var anchors = htmlDoc.DocumentNode.SelectNodes("//a");
                 //realm
-                var realmAnchor = FindRealm(webClient, anchors);
-                DownloadLink(true, null, realmAnchor, BoardName, webClient);
+                var realmAnchor = await FindRealm(webClient, anchors);
+                await DownloadLink(true, null, realmAnchor, BoardName, webClient);
                 //card backs
                 var cardBacks = FindCardBacks(anchors).ToList();
                 for (int i = 0; i < cardBacks.Count; i++)
-                    DownloadLink(true, null, cardBacks[i], "CardBack" + i.ToString() + ".png", webClient);
+                    await DownloadLink(true, null, cardBacks[i], "CardBack" + i.ToString() + ".png", webClient);
                 //guide
                 var guides = FindGuides(anchors).ToList();
                 for (int i = 0; i < guides.Count; i++)
-                    DownloadLink(true, null, guides[i], i.ToString() + ".png", webClient, "Guide");
+                    await DownloadLink(true, null, guides[i], i.ToString() + ".png", webClient, "Guide");
                 var allBoldEls = htmlDoc.DocumentNode.SelectNodes("//b")?.Where(e => e != null).ToList() ?? new List<HtmlNode>();
                 if (!allBoldEls.Any())
                     allBoldEls = htmlDoc.DocumentNode.SelectNodes("//li").ToList();
@@ -101,7 +103,7 @@ namespace Villainous
                         }
                         foreach (var cardAnchor in cardAnchors)
                         {
-                            var cardPath = DownLoadCardLink(true, cardAnchor, webClient, count.ToString());
+                            var cardPath = await DownLoadCardLink(true, cardAnchor, webClient, count.ToString());
                             cardsDic[count].Add(cardPath);
                         }
                         if (cardAnchors.Any())
@@ -112,8 +114,59 @@ namespace Villainous
                 }
                 //special cards
                 foreach (var link in GetSpecialCards(_currentVillainStr))
-                    DownLoadCardLink(true, link, null, webClient, "Special");
+                    await DownLoadCardLink(true, link, null, webClient, "Special");
             }
+        }
+
+        private HttpClient GetClient()
+        {
+            //var handler = new HttpClientHandler()
+            //{
+            //    AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate,
+            //    UseCookies = true,          // retain Cloudflare challenge cookies
+            //    CookieContainer = new System.Net.CookieContainer(),
+            //    AllowAutoRedirect = true,
+            //};
+
+            //var client = new HttpClient(handler);
+
+            //// Order matters — match Chrome's real header order
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Accept",
+            //    "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Language",
+            //    "en-US,en;q=0.9");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Accept-Encoding",
+            //    "gzip, deflate, br");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Connection",
+            //    "keep-alive");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent",
+            //    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Referer",
+            //    "https://www.google.com/");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Upgrade-Insecure-Requests", "1");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Dest", "document");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Mode", "navigate");
+            //client.DefaultRequestHeaders.TryAddWithoutValidation("Sec-Fetch-Site", "none");
+
+            return new HttpClient();
+        }
+
+        private async Task<string> GetHtmlString(HttpClient client, string link)
+        {
+            string url = link + "&prop=text&format=json";
+
+            string json = await client.GetStringAsync(url);
+
+            using var doc = JsonDocument.Parse(json);
+
+            string html = doc
+                .RootElement
+                .GetProperty("parse")
+                .GetProperty("text")
+                .GetProperty("*")
+                .GetString();
+
+            return html;
         }
 
         public bool GetCardCount(HtmlNode boldEl, out int count)
@@ -128,7 +181,7 @@ namespace Villainous
             return int.TryParse(innerText.Trim(' ')[0].ToString(), out count);
         }
 
-        private HtmlNode FindRealm(WebClient webClient, HtmlNodeCollection anchors)
+        private async Task<HtmlNode> FindRealm(HttpClient webClient, HtmlNodeCollection anchors)
         {
             for (int i = 0; i < anchors.Count; i++)
             {
@@ -136,7 +189,7 @@ namespace Villainous
                 if (!anchor.ChildAttributes("href").Any())
                     continue;
                 var link = anchor.Attributes["href"].Value;
-                if (link.Contains(BoardName) && LinkExists(webClient, anchor))
+                if (link.Contains(BoardName) && await LinkExists(webClient, anchor))
                     return anchor;
             }
             //not found? Try again
@@ -152,7 +205,7 @@ namespace Villainous
                     link.Contains("sector", StringComparison.InvariantCultureIgnoreCase) ||
                     link.Contains("territory", StringComparison.InvariantCultureIgnoreCase) ||
                     link.Contains("board", StringComparison.InvariantCultureIgnoreCase))
-                    && LinkExists(webClient, link))
+                    && await LinkExists(webClient, link))
                     return anchor;
 
             }
@@ -160,24 +213,25 @@ namespace Villainous
             return null;
         }
 
-        private bool LinkExists(WebClient webClient, HtmlNode anchor)
+        private async Task<bool> LinkExists(HttpClient webClient, HtmlNode anchor)
         {
-            return LinkExists(webClient, anchor.Attributes["href"].Value);
+            return await LinkExists(webClient, anchor.Attributes["href"].Value);
         }
 
-        private bool LinkExists(WebClient webClient, string url)
+        private async Task<bool> LinkExists(HttpClient webClient, string url)
         {
             try
             {
-                using (var stream = webClient.OpenRead(url))
-                {
-                    return true;
-                }
+                var request = new HttpRequestMessage(HttpMethod.Head, url);
+                var response = await webClient.SendAsync(request);
+
+                return response.StatusCode == HttpStatusCode.OK;
             }
             catch (Exception)
             {
                 return false;
             }
+
         }
 
         private IEnumerable<HtmlNode> FindCardBacks(HtmlNodeCollection anchors)
@@ -211,15 +265,15 @@ namespace Villainous
             }
         }
 
-        protected string DownLoadCardLink(bool villainSpecific, HtmlNode anchor, WebClient webClient, string subFolder)
+        protected async Task<string> DownLoadCardLink(bool villainSpecific, HtmlNode anchor, HttpClient webClient, string subFolder)
         {
             var link = anchor.Attributes["href"].Value;
             if (link.Contains("File:"))
                 link = anchor.ChildNodes.First().Attributes["data-src"].Value;
-            return DownLoadCardLink(villainSpecific, link, anchor, webClient, subFolder);
+            return await DownLoadCardLink(villainSpecific, link, anchor, webClient, subFolder);
         }
 
-        protected string DownLoadCardLink(bool villainSpecific, string link, HtmlNode anchor, WebClient webClient, string subFolder)
+        protected async Task<string> DownLoadCardLink(bool villainSpecific, string link, HtmlNode anchor, HttpClient webClient, string subFolder)
         {
             var extensionStr = ".png/";
             if (link.IndexOf(extensionStr) < 0)
@@ -234,10 +288,10 @@ namespace Villainous
                 cardScale *= FateCardScale;
             var cardScaleInt = (int)Math.Round(cardScale);
             linkEdited += $"/revision/latest/scale-to-width-down/{cardScaleInt}?cb=20190225014443\"";
-            return DownloadLink(villainSpecific, linkEdited, anchor, cardName, webClient, subFolder);
+            return await DownloadLink(villainSpecific, linkEdited, anchor, cardName, webClient, subFolder);
         }
 
-        private string DownloadLink(bool villainSpecific, string url, HtmlNode anchor, string fileName, WebClient webClient, string subFolder = null)
+        private async Task<string> DownloadLink(bool villainSpecific, string url, HtmlNode anchor, string fileName, HttpClient webClient, string subFolder = null)
         {
             if (string.IsNullOrEmpty(url) && anchor == null)
                 return null;
@@ -257,7 +311,7 @@ namespace Villainous
                     Console.WriteLine("Retry: " + retryCount);
                 try
                 {
-                    webClient.DownloadFile(url ?? anchor.Attributes["href"].Value, filePath);
+                    await DownloadFile(webClient, url ?? anchor.Attributes["href"].Value, filePath);
                     Console.WriteLine($"Downloaded {fileName}");
                     break;
                 }
@@ -271,7 +325,7 @@ namespace Villainous
                             var imgSrc = imgNode.Attributes["src"].Value;
                             if (!imgSrc.Contains("http"))
                                 imgSrc = imgNode.Attributes["data-src"].Value;
-                            webClient.DownloadFile(imgSrc, filePath);
+                            await DownloadFile(webClient, imgSrc, filePath);
                             Console.WriteLine($"Downloaded {fileName}");
                             break;
                         }
@@ -287,6 +341,13 @@ namespace Villainous
             }
             while (retryCount < 3);
             return filePath;
+        }
+        private async Task DownloadFile(HttpClient client, string url, string path)
+        {
+            var response = await client.GetAsync(url);
+            response.EnsureSuccessStatusCode();
+            var bytes = await response.Content.ReadAsByteArrayAsync();
+            await File.WriteAllBytesAsync(path, bytes);
         }
     }
 }

@@ -1,12 +1,14 @@
 ﻿// See https://aka.ms/new-console-template for more information
 
+using System.Net;
+
 namespace Villainous
 {
     internal class Program
     {
         private static bool _downloadCards = true;
 
-        static void Main(string[] args)
+        static async Task Main(string[] args)
         {
             Console.WriteLine("Download cards: " + (_downloadCards ? "ON" : "OFF"));
 
@@ -18,42 +20,48 @@ namespace Villainous
             var isDisneyHomebrew = ans.Equals("dh", StringComparison.InvariantCultureIgnoreCase);
             var isAnime = ans.Equals("a", StringComparison.InvariantCultureIgnoreCase);
             var isMarvelHomebrew = ans.Equals("mh", StringComparison.InvariantCultureIgnoreCase);
-
-            if (isDisney)
+            try
             {
-                Console.WriteLine("Disney Villainous");
-                var disney = new DisneyDownloader(_downloadCards);
-                disney.Download();
+                if (isDisney)
+                {
+                    Console.WriteLine("Disney Villainous");
+                    var disney = new DisneyDownloader(_downloadCards);
+                    await disney.Download();
+                }
+                else if (isMarvel)
+                {
+                    Console.WriteLine("Marvel Villainous");
+                    var marvel = new MarvelDownloader(_downloadCards);
+                    await marvel.Download();
+                }
+                else if (isStarWars)
+                {
+                    Console.WriteLine("Star Wars Villainous");
+                    var marvel = new StarWarsDownloader(_downloadCards);
+                    await marvel.Download();
+                }
+                else if (isDisneyHomebrew)
+                {
+                    Console.WriteLine("Disney Villainous Homebrew");
+                    var marvel = new DisneyHomebrewDownloader(_downloadCards);
+                    await marvel.Download();
+                }
+                else if (isAnime)
+                {
+                    Console.WriteLine("Anime Villainous");
+                    var anime = new AnimeDownloader(_downloadCards);
+                    await anime.Download();
+                }
+                else if (isMarvelHomebrew)
+                {
+                    Console.WriteLine("Marvel Villainous Homebrew");
+                    var marvel = new MarvelHomebrewDownloader(_downloadCards);
+                    await marvel.Download();
+                }
             }
-            else if (isMarvel)
+            catch (Exception ex)
             {
-                Console.WriteLine("Marvel Villainous");
-                var marvel = new MarvelDownloader(_downloadCards);
-                marvel.Download();
-            }
-            else if (isStarWars)
-            {
-                Console.WriteLine("Star Wars Villainous");
-                var marvel = new StarWarsDownloader(_downloadCards);
-                marvel.Download();
-            }
-            else if (isDisneyHomebrew)
-            {
-                Console.WriteLine("Disney Villainous Homebrew");
-                var marvel = new DisneyHomebrewDownloader(_downloadCards);
-                marvel.Download();
-            }
-            else if (isAnime)
-            {
-                Console.WriteLine("Anime Villainous");
-                var anime = new AnimeDownloader(_downloadCards);
-                anime.Download();
-            }
-            else if (isMarvelHomebrew)
-            {
-                Console.WriteLine("Marvel Villainous Homebrew");
-                var marvel = new MarvelHomebrewDownloader(_downloadCards);
-                marvel.Download();
+                Console.WriteLine(ex.ToString());
             }
         }
     }

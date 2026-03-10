@@ -4,13 +4,13 @@
     {
 
         public StarWarsDownloader(bool downloadCards)
-            : base(@"https://sw-villainous.fandom.com/wiki/", "Sector.jpg", downloadCards, 1050, 1)
+            : base(@"https://sw-villainous.fandom.com/api.php?action=parse&page=", "Sector.jpg", downloadCards, 1050, 1)
         {
         }
 
-        public void Download()
+        public async Task Download()
         {
-            DownloadVillains();
+            await DownloadVillains();
         }
 
         protected override IEnumerable<string> GetSpecialCards(string villain)
